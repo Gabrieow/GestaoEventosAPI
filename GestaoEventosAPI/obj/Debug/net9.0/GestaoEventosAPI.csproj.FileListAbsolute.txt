@@ -154,3 +154,11 @@ C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\obj\Debug\net9.0\refint\GestaoE
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\obj\Debug\net9.0\GestaoEventosAPI.pdb
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\obj\Debug\net9.0\GestaoEventosAPI.genruntimeconfig.cache
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\obj\Debug\net9.0\ref\GestaoEventosAPI.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Logging.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Tokens.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\System.IdentityModel.Tokens.Jwt.dll

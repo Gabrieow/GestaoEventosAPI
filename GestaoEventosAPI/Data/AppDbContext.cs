@@ -16,6 +16,7 @@ namespace GestaoEventosAPI.Data
         public DbSet<Cliente> Clientes { get; set; }
         public DbSet<Organizador> Organizadores { get; set; }
         public DbSet<Ingresso> Ingressos { get; set; }
+        public DbSet<Usuario> Usuarios { get; set; }
 
     }
 }
