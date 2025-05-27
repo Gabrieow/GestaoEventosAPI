@@ -85,39 +85,6 @@ namespace GestaoEventosAPI.Controllers
             return CreatedAtAction(nameof(GetById), new { id = usuario.Id }, usuario);
         }
 
-        [HttpPost("vincular-existente")]
-        [Authorize(Roles = "Admin")] 
-        public async Task<IActionResult> VincularUsuarioExistente([FromQuery] Guid usuarioId, [FromBody] OrganizadorVincularDto dto)
-        {
-            var usuario = await _context.Usuarios.FindAsync(usuarioId);
-            if (usuario == null || usuario.Role != Roles.Organizador)
-                return BadRequest("Usuário não encontrado ou não é do tipo organizador.");
-
-            var organizadorExistente = await _context.Organizadores
-                .FirstOrDefaultAsync(o => o.UsuarioId == usuarioId);
-            if (organizadorExistente != null)
-                return Conflict("Usuário já está vinculado como organizador.");
-
-            var novoOrganizador = new Organizador
-            {
-                Nome = dto.Nome,
-                Email = dto.Email,
-                Telefone = dto.Telefone,
-                CNPJ = dto.Cnpj,
-                Endereco = dto.Endereco,
-                Cidade = dto.Cidade,
-                Estado = dto.Estado,
-                CEP = dto.Cep,
-                UsuarioId = usuarioId,
-                Usuario = usuario
-            };
-
-            _context.Organizadores.Add(novoOrganizador);
-            await _context.SaveChangesAsync();
-
-            return Ok(novoOrganizador);
-        }
-
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateOrganizador(Guid id, [FromBody] UpdateOrganizadorDto dto)
         {
