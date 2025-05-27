@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GestaoEventosAPI.Domain.Enums;
 
 namespace GestaoEventosAPI.Domain.Entities
@@ -13,10 +14,12 @@ namespace GestaoEventosAPI.Domain.Entities
 
         // cliente que comprou
         public Guid ClienteId { get; set; }
-        public required Cliente Cliente { get; set; }
-    
+        public Cliente? Cliente { get; set; }
+
         // evento para o qual o ingresso foi comprado
         public Guid EventoId { get; set; }
-        public required Evento Evento { get; set; }
+
+        [JsonIgnore]
+        public Evento? Evento { get; set; }
     }
 }

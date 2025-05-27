@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;
+using GestaoEventosAPI.Application.DTOs;
+using GestaoEventosAPI.Application;
+using GestaoEventosAPI.Domain.Enums;
 
 namespace GestaoEventosAPI.Controllers
 {
@@ -39,11 +42,22 @@ namespace GestaoEventosAPI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]  // Só Admin pode criar usuário
-        public async Task<IActionResult> Create([FromBody] Usuario usuario)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create([FromBody] UsuarioCreateModel model)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (_context.Usuarios.Any(u => u.Email == model.Email))
+                return Conflict("Já existe um usuário com este e-mail.");
+
+            var usuario = new Usuario
+            {
+                Nome = model.Nome,
+                Email = model.Email,
+                SenhaHash = HashGenerator.ComputeSha256Hash(model.Senha),
+                Role = model.Role
+            };
 
             _context.Usuarios.Add(usuario);
             await _context.SaveChangesAsync();
@@ -52,28 +66,23 @@ namespace GestaoEventosAPI.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]  // Só Admin pode atualizar usuário
-        public async Task<IActionResult> Update(Guid id, [FromBody] Usuario usuario)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Update(Guid id, UsuarioUpdateModel model)
         {
-            if (id != usuario.Id)
-                return BadRequest();
+            var usuario = await _context.Usuarios.FindAsync(id);
+            if (usuario == null) return NotFound();
 
-            var existingUser = await _context.Usuarios.FindAsync(id);
-            if (existingUser == null)
-                return NotFound();
+            if (model.Nome != null) usuario.Nome = model.Nome;
+            if (model.Email != null) usuario.Email = model.Email;
+            if (model.Senha != null) usuario.SenhaHash = HashGenerator.ComputeSha256Hash(model.Senha);
+            if (model.Role.HasValue) usuario.Role = model.Role.Value;
 
-            existingUser.Nome = usuario.Nome;
-            existingUser.Email = usuario.Email;
-            existingUser.Role = usuario.Role;
-
-            _context.Entry(existingUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]  // Só Admin pode deletar usuário
+        [Authorize(Roles = "Admin")]  // só adm pode deletar usuário
         public async Task<IActionResult> Delete(Guid id)
         {
             var usuario = await _context.Usuarios.FindAsync(id);
@@ -85,5 +94,6 @@ namespace GestaoEventosAPI.Controllers
 
             return NoContent();
         }
+
     }
 }

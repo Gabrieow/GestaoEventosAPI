@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using GestaoEventosAPI.Application.DTOs;
+using System.Security.Claims;
 
 namespace GestaoEventosAPI.Controllers
 {
@@ -36,60 +38,39 @@ namespace GestaoEventosAPI.Controllers
             return Ok(clientes);
         }
 
-        [HttpGet("{id}")]
-        [AllowAnonymous]
-        public async Task<IActionResult> GetById(Guid id)
-        {
-            var cliente = await _context.Usuarios.FindAsync(id);
-            if (cliente == null || cliente.Role != Roles.Cliente)
-                return NotFound();
-
-            return Ok(cliente);
-        }
-
-        [HttpPost]
-        [Authorize(Roles = "Admin")] // só Admin pode criar
-        public async Task<IActionResult> Create([FromBody] Usuario cliente)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            cliente.Role = Roles.Cliente;
-
-            await _context.Usuarios.AddAsync(cliente);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = cliente.Id }, cliente);
-        }
-
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")] // só Admin pode atualizar
-        public async Task<IActionResult> Update(Guid id, [FromBody] Usuario cliente)
+        [Authorize(Roles = "Admin,Cliente")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] ClienteUpdate dto)
         {
-            if (id != cliente.Id)
-                return BadRequest();
+            var usuario = await _context.Usuarios.FindAsync(id);
+            var cliente = await _context.Clientes.FindAsync(id);
 
-            var existingCliente = await _context.Usuarios.FindAsync(id);
-            if (existingCliente == null || existingCliente.Role != Roles.Cliente)
+            if (usuario == null || usuario.Role != Roles.Cliente || cliente == null)
                 return NotFound();
 
-            existingCliente.Nome = cliente.Nome;
-            existingCliente.Email = cliente.Email;
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
-            await _context.SaveChangesAsync();
+            if (userIdString == null || userRole == null)
+                return Unauthorized();
 
-            return NoContent();
-        }
+            if (userRole == Roles.Cliente.ToString() && userIdString != id.ToString())
+                return Forbid();
 
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")] // só Admin pode deletar
-        public async Task<IActionResult> Delete(Guid id)
-        {
-            var cliente = await _context.Usuarios.FindAsync(id);
-            if (cliente == null || cliente.Role != Roles.Cliente)
-                return NotFound();
+            // Atualizar dados do usuário
+            usuario.Nome = dto.Nome ?? usuario.Nome;
+            usuario.Email = dto.Email ?? usuario.Email;
 
-            _context.Usuarios.Remove(cliente);
+            // Atualizar dados do cliente
+            cliente.Nome = dto.Nome ?? cliente.Nome;
+            cliente.Email = dto.Email ?? cliente.Email;
+            cliente.Telefone = dto.Telefone ?? cliente.Telefone;
+            cliente.CPF = dto.CPF ?? cliente.CPF;
+            cliente.Endereco = dto.Endereco ?? cliente.Endereco;
+            cliente.Cidade = dto.Cidade ?? cliente.Cidade;
+            cliente.Estado = dto.Estado ?? cliente.Estado;
+            cliente.CEP = dto.CEP ?? cliente.CEP;
+
             await _context.SaveChangesAsync();
 
             return NoContent();

@@ -11,5 +11,9 @@ namespace GestaoEventosAPI.Domain.Entities
         public required string Cidade { get; set; }
         public required string Estado { get; set; }
         public required string CEP { get; set; }
+
+        // relação com usuário (todo organizador é um usuário)
+        public Guid UsuarioId { get; set; }
+        public required Usuario Usuario { get; set; }
     }
 }

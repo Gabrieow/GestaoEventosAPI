@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 using GestaoEventosAPI.Data;
 using GestaoEventosAPI.Domain.Entities;
@@ -10,6 +11,7 @@ using GestaoEventosAPI.Application.DTOs;
 using GestaoEventosAPI.Domain.Enums;
 using GestaoEventosAPI.Application;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 
 namespace GestaoEventosAPI.Controllers
 {
@@ -18,58 +20,72 @@ namespace GestaoEventosAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly string _key;
+        private readonly string _secretKey;
 
         public AuthController(AppDbContext context, IOptions<JwtSettings> jwtSettings)
         {
             _context = context;
-            _key = jwtSettings.Value.SecretKey;
+            _secretKey = jwtSettings.Value.SecretKey;
+            if (string.IsNullOrEmpty(_secretKey))
+                throw new Exception("Chave secreta JWT não configurada no appsettings.json");
         }
 
         [HttpPost("register")]
-        public IActionResult Register([FromBody] RegisterModel register)
+        public async Task<IActionResult> Register([FromBody] RegisterModel dto)
         {
-            if (string.IsNullOrEmpty(register.Nome) || string.IsNullOrEmpty(register.Email) || string.IsNullOrEmpty(register.Senha))
-            {
-                return BadRequest("Todos os campos são obrigatórios.");
-            }
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            if (_context.Usuarios.Any(u => u.Email == register.Email))
-                return Conflict("Já existe um usuário com este e-mail.");
+            var usuarioExistente = await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Email == dto.Email);
+
+            if (usuarioExistente != null)
+                return BadRequest("Email já cadastrado.");
 
             var usuario = new Usuario
             {
-                Nome = register.Nome,
-                Email = register.Email,
-                SenhaHash = register.Senha
-                    .GetHashCode().ToString(), // simples hash para exemplo, usar método de hash seguro em produção
-                Role = Roles.Cliente // definindo o papel como "Cliente" por padrão, para criar novos usuários admin ou organizadores, implementar direto no bd
+                Id = Guid.NewGuid(),
+                Nome = dto.Nome,
+                Email = dto.Email,
+                SenhaHash = HashGenerator.ComputeSha256Hash(dto.Senha),
+                Role = Roles.Cliente // definindo como cliente direto
             };
 
-            // Adiciona o usuário ao banco de dados
-            _context.Usuarios.Add(usuario);
-            _context.SaveChanges();
+            var cliente = new Cliente
+            {
+                Id = usuario.Id, // mesmo Id do usuário para vincular
+                Nome = dto.Nome,
+                Email = dto.Email,
 
-            return Ok("Usuário registrado com sucesso.");
+                Telefone = "",
+                CPF = "",
+                Endereco = "",
+                Cidade = "",
+                Estado = "",
+                CEP = ""
+            };
+
+            _context.Usuarios.Add(usuario);
+            _context.Clientes.Add(cliente);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { usuario.Id, dto.Nome, dto.Email });
         }
 
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginModel login)
         {
             if (string.IsNullOrEmpty(login.Email) || string.IsNullOrEmpty(login.Senha))
-            {
                 return BadRequest("Todos os campos são obrigatórios.");
-            }
 
-            var hashedSenha = login.Senha.GetHashCode().ToString();
+            var hashedSenha = HashGenerator.ComputeSha256Hash(login.Senha);
             var usuario = _context.Usuarios.FirstOrDefault(u => u.Email == login.Email && u.SenhaHash == hashedSenha);
 
             if (usuario == null)
-            {
                 return Unauthorized("E-mail ou senha inválidos.");
-            }
 
-            var token = GenerateToken(usuario.Email, usuario.Role);
+            var token = GenerateToken(usuario.Email, usuario.Role, usuario.Id);
+
             return Ok(new
             {
                 token,
@@ -79,23 +95,43 @@ namespace GestaoEventosAPI.Controllers
             });
         }
 
-        private string GenerateToken(string email, Roles role)
+        [HttpGet("usuarios")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult GetUsuarios()
         {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var tokenKey = Encoding.UTF8.GetBytes(_key);
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new[]
+            var usuarios = _context.Usuarios
+                .Select(u => new
                 {
+                    u.Id,
+                    u.Nome,
+                    u.Email,
+                    Role = u.Role.ToString()
+                })
+                .ToList();
+
+            return Ok(usuarios);
+        }
+
+        private string GenerateToken(string email, Roles role, Guid userId)
+        {
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
                 new Claim(ClaimTypes.Email, email),
                 new Claim(ClaimTypes.Role, role.ToString())
-            }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(tokenKey), SecurityAlgorithms.HmacSha256Signature)
             };
 
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            var token = new JwtSecurityToken(
+                issuer: "seuIssuer",
+                audience: "seuAudience",
+                claims: claims,
+                expires: DateTime.Now.AddHours(1),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    }
+            }
 }

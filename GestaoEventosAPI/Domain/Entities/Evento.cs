@@ -15,7 +15,7 @@ namespace GestaoEventosAPI.Domain.Entities
         // vinculo com organizador, todo evento PRECISA ter um organizador
         // e um organizador pode ter varios eventos
         public Guid OrganizadorId { get; set; }
-        public required Organizador Organizador { get; set; }
+        public Organizador? Organizador { get; set; }
 
         // vinculo com ingresso, todo evento pode ter varios ingressos
         // e um ingresso pode estar vinculado a um evento

@@ -5,3 +5,5 @@ namespace GestaoEventosAPI.Application
         public string SecretKey { get; set; } = string.Empty;
     }
 }
+
+// Configurações do JWT (authenticação via token)

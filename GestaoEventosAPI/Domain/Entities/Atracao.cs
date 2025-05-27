@@ -12,6 +12,6 @@ namespace GestaoEventosAPI.Domain.Entities
         // vinculo com evento, todo evento PRECISA ter uma atração
         // e um evento pode ter varias atrações
         public Guid EventoID { get; set; }
-        public required Evento Evento { get; set; }
+        public Evento? Evento { get; set; }
     }
 }

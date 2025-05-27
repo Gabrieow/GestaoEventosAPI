@@ -162,3 +162,4 @@ C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.Iden
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Microsoft.IdentityModel.Tokens.dll
 C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\System.IdentityModel.Tokens.Jwt.dll
+C:\Users\gabri\GestaoEventosAPI\GestaoEventosAPI\bin\Debug\net9.0\Bogus.dll

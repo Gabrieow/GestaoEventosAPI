@@ -1,16 +1,17 @@
 using GestaoEventosAPI.Domain.Entities;
-    using GestaoEventosAPI.Domain.Enums;
-    using GestaoEventosAPI.Data;
-    using Microsoft.AspNetCore.Authorization;
-    using Microsoft.AspNetCore.Mvc;
-    using Microsoft.EntityFrameworkCore;
-    using System.Security.Claims;
+using GestaoEventosAPI.Domain.Enums;
+using GestaoEventosAPI.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using GestaoEventosAPI.Application.DTOs;
 
 namespace GestaoEventosAPI.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class IngressoController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -23,10 +24,24 @@ namespace GestaoEventosAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var ingressos = await _context.Ingressos
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (userIdString == null || userRole == null)
+                return Unauthorized();
+
+            var userId = Guid.Parse(userIdString);
+
+            IQueryable<Ingresso> query = _context.Ingressos
                 .Include(i => i.Evento)
-                .Include(i => i.Cliente)
-                .ToListAsync();
+                .Include(i => i.Cliente);
+
+            if (userRole == Roles.Cliente.ToString())
+            {
+                query = query.Where(i => i.ClienteId == userId);
+            }
+
+            var ingressos = await query.ToListAsync();
             return Ok(ingressos);
         }
 
@@ -41,7 +56,23 @@ namespace GestaoEventosAPI.Controllers
             if (ingresso == null)
                 return NotFound();
 
-            return Ok(ingresso);
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (userIdString == null || userRole == null)
+                return Unauthorized();
+
+            var userId = Guid.Parse(userIdString);
+
+            // só permite se for admin, org ou dono do ingresso
+            if (userRole == Roles.Admin.ToString() ||
+                userRole == Roles.Organizador.ToString() ||
+                ingresso.ClienteId == userId)
+            {
+                return Ok(ingresso);
+            }
+
+            return Forbid();
         }
 
         [HttpPost]
@@ -51,19 +82,16 @@ namespace GestaoEventosAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // pega o ID do cliente autenticado no token
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userIdString == null)
                 return Unauthorized();
 
             var clienteId = Guid.Parse(userIdString);
 
-            // valida se o evento existe
             var evento = await _context.Eventos.FindAsync(ingresso.EventoId);
             if (evento == null)
                 return BadRequest("Evento não encontrado.");
 
-            // associa o ingresso ao cliente autenticado (ignora o cliente enviado no corpo, se existir)
             ingresso.ClienteId = clienteId;
 
             _context.Ingressos.Add(ingresso);
@@ -74,26 +102,27 @@ namespace GestaoEventosAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin, Cliente")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] Ingresso ingresso)
+        public async Task<IActionResult> Update(Guid id, [FromBody] IngressoUpdateDTO ingressoDto)
         {
-            if (id != ingresso.Id)
-                return BadRequest();
-
-            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userIdString == null)
-                return Unauthorized();
-
-            var clienteId = Guid.Parse(userIdString);
-
             var existingIngresso = await _context.Ingressos.FindAsync(id);
             if (existingIngresso == null)
                 return NotFound();
 
-            // verifica se o ingresso pertence ao cliente logado
-            if (existingIngresso.ClienteId != clienteId)
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (userIdString == null || userRole == null)
+                return Unauthorized();
+
+            var clienteId = Guid.Parse(userIdString);
+
+            if (userRole == Roles.Cliente.ToString() && existingIngresso.ClienteId != clienteId)
                 return Forbid();
 
-            existingIngresso.Quantidade = ingresso.Quantidade;
+            existingIngresso.EventoId = ingressoDto.EventoId;
+            existingIngresso.Quantidade = ingressoDto.Quantidade;
+            existingIngresso.Preco = ingressoDto.Preco;
+            existingIngresso.TipoIngresso = ingressoDto.TipoIngresso;
 
             _context.Entry(existingIngresso).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -106,7 +135,9 @@ namespace GestaoEventosAPI.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userIdString == null)
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (userIdString == null || userRole == null)
                 return Unauthorized();
 
             var clienteId = Guid.Parse(userIdString);
@@ -115,8 +146,7 @@ namespace GestaoEventosAPI.Controllers
             if (ingresso == null)
                 return NotFound();
 
-            // só permite deletar se for dono do ingresso
-            if (ingresso.ClienteId != clienteId)
+            if (userRole == Roles.Cliente.ToString() && ingresso.ClienteId != clienteId)
                 return Forbid();
 
             _context.Ingressos.Remove(ingresso);
@@ -125,7 +155,6 @@ namespace GestaoEventosAPI.Controllers
             return NoContent();
         }
 
-        // buscar ingressos de um cliente específico
         [HttpGet("cliente/{clienteId}")]
         [Authorize(Roles = "Admin, Organizador")]
         public async Task<IActionResult> GetByCliente(Guid clienteId)

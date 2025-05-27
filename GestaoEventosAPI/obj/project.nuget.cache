@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "dDBPTVnn9Gw=",
+  "dgSpecHash": "Mv8HUSkngco=",
   "success": true,
   "projectFilePath": "C:\\Users\\gabri\\GestaoEventosAPI\\GestaoEventosAPI\\GestaoEventosAPI.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\gabri\\.nuget\\packages\\bogus\\35.6.3\\bogus.35.6.3.nupkg.sha512",
     "C:\\Users\\gabri\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\gabri\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\9.0.5\\microsoft.aspnetcore.authentication.jwtbearer.9.0.5.nupkg.sha512",
     "C:\\Users\\gabri\\.nuget\\packages\\microsoft.aspnetcore.openapi\\9.0.1\\microsoft.aspnetcore.openapi.9.0.1.nupkg.sha512",

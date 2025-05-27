@@ -1,7 +1,7 @@
 using GestaoEventosAPI.Domain.Entities;
 using GestaoEventosAPI.Domain.Enums;
 using GestaoEventosAPI.Data;
-using GestaoEventosAPI.Application;
+using GestaoEventosAPI.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using GestaoEventosAPI.Application;
 
 namespace GestaoEventosAPI.Controllers
 {
@@ -30,7 +31,8 @@ namespace GestaoEventosAPI.Controllers
         public async Task<IActionResult> GetAll()
         {
             var eventos = await _context.Eventos.ToListAsync();
-            return Ok(eventos);
+            var dtos = eventos.Select(ToReadDto);
+            return Ok(dtos);
         }
 
         [HttpGet("{id}")]
@@ -40,51 +42,117 @@ namespace GestaoEventosAPI.Controllers
             if (evento == null)
                 return NotFound();
 
-            return Ok(evento);
+            return Ok(ToReadDto(evento));
         }
 
         [HttpPost]
         [Authorize(Roles = "Admin, Organizador")]
-        public async Task<IActionResult> Create([FromBody] Evento evento)
+        public async Task<IActionResult> Create(EventoCreateDto eventoDto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
+            // 1. Pegar o usuário logado (do token)
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
+            if (userIdClaim == null)
                 return Unauthorized();
 
-            var organizador = await _context.Usuarios.FindAsync(Guid.Parse(userId));
-            if (organizador == null || organizador.Role != Roles.Organizador)
-                return Forbid();
+            Guid usuarioIdLogado = Guid.Parse(userIdClaim.Value);
 
-            evento.OrganizadorId = organizador.Id;
-            await _context.Eventos.AddAsync(evento);
+            // 2. Buscar o organizador relacionado a esse usuário
+            var organizador = await _context.Organizadores
+                .FirstOrDefaultAsync(o => o.UsuarioId == usuarioIdLogado);
+
+            if (organizador == null)
+                return BadRequest("Usuário logado não está associado a nenhum organizador.");
+
+            // 3. Criar o evento associando o OrganizadorId correto
+            Evento novoEvento = new Evento
+            {
+                Nome = eventoDto.Nome,
+                Descricao = eventoDto.Descricao,
+                DataInicio = eventoDto.DataInicio,
+                DataFim = eventoDto.DataFim,
+                Localizacao = eventoDto.Localizacao,
+                PrecoIngresso = eventoDto.PrecoIngresso,
+                QuantidadeIngressos = eventoDto.QuantidadeIngressos,
+                Categoria = eventoDto.Categoria,
+
+                OrganizadorId = organizador.Id // associando o organizador correto!
+            };
+
+            // 4. Salvar no banco
+            _context.Eventos.Add(novoEvento);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = evento.Id }, evento);
+            // 5. Buscar o evento criado com organizador e usuário carregados
+            Evento? eventoComDados = await _context.Eventos
+                .Include(e => e.Organizador)
+                    .ThenInclude(o => o != null ? o.Usuario : null)
+                .FirstOrDefaultAsync(e => e.Id == novoEvento.Id);
+
+            if (eventoComDados == null)
+                return NotFound();
+
+            // 6. Retornar DTO completo
+            return CreatedAtAction(nameof(GetById), new { id = eventoComDados.Id }, ToReadDto(eventoComDados));
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin, Organizador")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] Evento evento)
+        public async Task<IActionResult> Update(Guid id, [FromBody] EventoCreateDto eventoDto)
         {
-            if (id != evento.Id)
-                return BadRequest();
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
+            var eventoExistente = await _context.Eventos.FindAsync(id);
+            if (eventoExistente == null)
+                return NotFound();
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdStr == null)
                 return Unauthorized();
 
-            var organizador = await _context.Usuarios.FindAsync(Guid.Parse(userId));
-            if (organizador == null || organizador.Role != Roles.Organizador)
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            // Buscar o usuário logado
+            var usuarioLogado = await _context.Usuarios.FindAsync(userId);
+            if (usuarioLogado == null || (usuarioLogado.Role != Roles.Organizador && usuarioLogado.Role != Roles.Admin))
                 return Forbid();
 
-            evento.OrganizadorId = organizador.Id;
-            _context.Entry(evento).State = EntityState.Modified;
+            if (usuarioLogado.Role == Roles.Organizador)
+            {
+                var organizadorLogado = await _context.Organizadores
+                    .FirstOrDefaultAsync(o => o.UsuarioId == usuarioLogado.Id);
+
+                if (organizadorLogado == null)
+                    return Forbid();
+
+                if (eventoExistente.OrganizadorId != organizadorLogado.Id)
+                    return Forbid();
+            }
+
+            // Atualiza os dados do evento
+            eventoExistente.Nome = eventoDto.Nome;
+            eventoExistente.Descricao = eventoDto.Descricao;
+            eventoExistente.DataInicio = eventoDto.DataInicio;
+            eventoExistente.DataFim = eventoDto.DataFim;
+            eventoExistente.Localizacao = eventoDto.Localizacao;
+            eventoExistente.PrecoIngresso = eventoDto.PrecoIngresso;
+            eventoExistente.QuantidadeIngressos = eventoDto.QuantidadeIngressos;
+            eventoExistente.Categoria = eventoDto.Categoria;
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            // Opcional: trazer o evento atualizado com organizador e usuário para retornar DTO completo
+            Evento? eventoAtualizado = await _context.Eventos
+                .Include(e => e.Organizador)
+                .ThenInclude(o => o != null ? o.Usuario : null)
+                .FirstOrDefaultAsync(e => e.Id == eventoExistente.Id);
+
+            if (eventoAtualizado == null)
+                return NotFound();
+
+            var dto = ToReadDto(eventoAtualizado);
+            return Ok(dto);
         }
 
         [HttpDelete("{id}")]
@@ -95,13 +163,28 @@ namespace GestaoEventosAPI.Controllers
             if (evento == null)
                 return NotFound();
 
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null)
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdStr == null)
                 return Unauthorized();
 
-            var organizador = await _context.Usuarios.FindAsync(Guid.Parse(userId));
-            if (organizador == null || organizador.Role != Roles.Organizador)
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized();
+
+            var usuarioLogado = await _context.Usuarios.FindAsync(userId);
+            if (usuarioLogado == null || (usuarioLogado.Role != Roles.Organizador && usuarioLogado.Role != Roles.Admin))
                 return Forbid();
+
+            if (usuarioLogado.Role == Roles.Organizador)
+            {
+                var organizadorLogado = await _context.Organizadores
+                    .FirstOrDefaultAsync(o => o.UsuarioId == usuarioLogado.Id);
+
+                if (organizadorLogado == null)
+                    return Forbid();
+
+                if (evento.OrganizadorId != organizadorLogado.Id)
+                    return Forbid();
+            }
 
             _context.Eventos.Remove(evento);
             await _context.SaveChangesAsync();
@@ -116,7 +199,8 @@ namespace GestaoEventosAPI.Controllers
                 .Where(e => e.Nome.Contains(query) || e.Descricao.Contains(query))
                 .ToListAsync();
 
-            return Ok(eventos);
+            var dtos = eventos.Select(ToReadDto);
+            return Ok(dtos);
         }
 
         [HttpGet("filter")]
@@ -133,7 +217,10 @@ namespace GestaoEventosAPI.Controllers
             if (dataFim.HasValue)
                 eventos = eventos.Where(e => e.DataFim <= dataFim.Value);
 
-            return Ok(await eventos.ToListAsync());
+            var resultado = await eventos.ToListAsync();
+            var dtos = resultado.Select(ToReadDto);
+
+            return Ok(dtos);
         }
 
         [HttpGet("organizador/{id}")]
@@ -145,7 +232,8 @@ namespace GestaoEventosAPI.Controllers
             if (eventos == null || !eventos.Any())
                 return NotFound();
 
-            return Ok(eventos);
+            var dtos = eventos.Select(ToReadDto);
+            return Ok(dtos);
         }
 
         [HttpGet("cliente/{id}")]
@@ -162,8 +250,59 @@ namespace GestaoEventosAPI.Controllers
                 .ToListAsync();
 
             var eventos = ingressos.Select(i => i.Evento).ToList();
+            var dtos = eventos.Select(ToReadDto);
 
-            return Ok(eventos);
+            return Ok(dtos);
+        }
+
+        private EventoReadDto ToReadDto(Evento? e)
+        {
+            if (e == null)
+            {
+                throw new ArgumentNullException(nameof(e), "Evento não pode ser nulo.");
+            }
+
+            var organizador = _context.Organizadores
+                .Include(o => o.Usuario)
+                .FirstOrDefault(o => o.Id == e.OrganizadorId);
+
+            if (organizador == null)
+            {
+                throw new Exception("Organizador não encontrado.");
+            }
+
+            return new EventoReadDto
+            {
+                Id = e.Id,
+                Nome = e.Nome,
+                Descricao = e.Descricao,
+                DataInicio = e.DataInicio,
+                DataFim = e.DataFim,
+                Localizacao = e.Localizacao,
+                PrecoIngresso = e.PrecoIngresso,
+                QuantidadeIngressos = e.QuantidadeIngressos,
+                Categoria = e.Categoria,
+
+                Organizador = new OrganizadorDto
+                {
+                    Id = organizador.Id,
+                    Nome = organizador.Nome,
+                    Email = organizador.Email,
+                    Telefone = organizador.Telefone,
+                    CNPJ = organizador.CNPJ,
+                    Endereco = organizador.Endereco,
+                    Cidade = organizador.Cidade,
+                    Estado = organizador.Estado,
+                    CEP = organizador.CEP,
+                    Usuario = new UsuarioDto
+                    {
+                        Id = organizador.Usuario.Id,
+                        Nome = organizador.Usuario.Nome,
+                        Email = organizador.Usuario.Email,
+                        Role = organizador.Usuario.Role
+                    }
+                }
+            };
         }
     }
 }
