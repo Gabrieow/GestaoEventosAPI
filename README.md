@@ -62,12 +62,12 @@ As entidades principais incluem:
 ## ⚙️ Tecnologias Utilizadas
 
 ``` bash
-- .NET 6
-- C#
-- Entity Framework Core
-- SQLite
-- AutoMapper
-- Swagger (documentação)
+.NET 6
+C#
+Entity Framework Core
+SQLite
+AutoMapper
+Swagger (documentação)
 ```
 
 ## ✅ Testes
