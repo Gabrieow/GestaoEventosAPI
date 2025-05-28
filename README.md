@@ -24,14 +24,24 @@ O projeto foi desenvolvido utilizando os seguintes princípios:
 ``` bash
 /API
 │
+├── Application/
+│    ├── DTOs/
+│    ├── JwtSettings.cs
+│    └── HashGenerator.cs
+│ 
 ├── Controllers/
-├── Models/
-├── DTOs/
-├── Enums/
+│ 
 ├── Data/
-├── Services/
-├── Repositories/
-└── Program.cs / Startup.cs
+│    ├── Migrations/
+│    └── AppDpBcontext.cs
+│ 
+├── Domain/
+│    ├── Entities/
+│    └── Enums/
+│ 
+├── gestaoeventos.db
+│
+└── Program.cs
 ```
 ---
 
@@ -39,10 +49,10 @@ O projeto foi desenvolvido utilizando os seguintes princípios:
 
 | Verbo HTTP | Rota                   | Descrição                         |
 |------------|------------------------|-----------------------------------|
-| GET        | /api/eventos           | Lista todos os eventos            |
-| POST       | /api/eventos           | Cria um novo evento               |
-| GET        | /api/ingressos/{id}    | Consulta um ingresso específico   |
-| POST       | /api/usuarios/login    | Autenticação do usuário           |
+| GET        | /api/evento            | Lista todos os eventos            |
+| POST       | /api/evento            | Cria um novo evento               |
+| GET        | /api/auth/register     | Resgistro de um novo usuário      |
+| POST       | /api/auth/login        | Autenticação do usuário           |
 | ...        | ...                    | Outros endpoints conforme a regra |
 
 Consulte a documentação da API (Swagger) para visualizar todos os endpoints e seus respectivos modelos.
@@ -79,6 +89,10 @@ SQLite
 
 ``` bash
 AutoMapper
+```
+
+``` bash
+JWT Auth
 ```
 
 ``` bash
