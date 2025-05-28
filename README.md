@@ -63,10 +63,25 @@ As entidades principais incluem:
 
 ``` bash
 .NET 6
+```
+
+``` bash
 C#
+```
+
+``` bash
 Entity Framework Core
+```
+
+``` bash
 SQLite
+```
+
+``` bash
 AutoMapper
+```
+
+``` bash
 Swagger (documentação)
 ```
 
