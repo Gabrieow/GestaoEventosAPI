@@ -1,0 +1,14 @@
+# Pastas geradas automaticamente
+bin/
+obj/
+
+# Arquivos e bancos locais
+*.user
+*.suo
+
+# Configurações de IDE
+.vscode/
+*.swp
+
+# Outras possíveis pastas temporárias
+*.log
