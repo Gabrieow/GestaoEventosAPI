@@ -72,7 +72,7 @@ As entidades principais incluem:
 ## ⚙️ Tecnologias Utilizadas
 
 ``` bash
-.NET 6
+.NET 9
 ```
 
 ``` bash
