@@ -49,21 +49,18 @@ namespace GestaoEventosAPI.Controllers
         [Authorize(Roles = "Admin, Organizador")]
         public async Task<IActionResult> Create(EventoCreateDto eventoDto)
         {
-            // 1. Pegar o usuário logado (do token)
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier");
             if (userIdClaim == null)
                 return Unauthorized();
 
             Guid usuarioIdLogado = Guid.Parse(userIdClaim.Value);
 
-            // 2. Buscar o organizador relacionado a esse usuário
             var organizador = await _context.Organizadores
                 .FirstOrDefaultAsync(o => o.UsuarioId == usuarioIdLogado);
 
             if (organizador == null)
                 return BadRequest("Usuário logado não está associado a nenhum organizador.");
 
-            // 3. Criar o evento associando o OrganizadorId correto
             Evento novoEvento = new Evento
             {
                 Nome = eventoDto.Nome,
@@ -75,14 +72,12 @@ namespace GestaoEventosAPI.Controllers
                 QuantidadeIngressos = eventoDto.QuantidadeIngressos,
                 Categoria = eventoDto.Categoria,
 
-                OrganizadorId = organizador.Id // associando o organizador correto!
+                OrganizadorId = organizador.Id
             };
 
-            // 4. Salvar no banco
             _context.Eventos.Add(novoEvento);
             await _context.SaveChangesAsync();
 
-            // 5. Buscar o evento criado com organizador e usuário carregados
             Evento? eventoComDados = await _context.Eventos
                 .Include(e => e.Organizador)
                     .ThenInclude(o => o != null ? o.Usuario : null)
@@ -91,7 +86,6 @@ namespace GestaoEventosAPI.Controllers
             if (eventoComDados == null)
                 return NotFound();
 
-            // 6. Retornar DTO completo
             return CreatedAtAction(nameof(GetById), new { id = eventoComDados.Id }, ToReadDto(eventoComDados));
         }
 
@@ -113,7 +107,6 @@ namespace GestaoEventosAPI.Controllers
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized();
 
-            // Buscar o usuário logado
             var usuarioLogado = await _context.Usuarios.FindAsync(userId);
             if (usuarioLogado == null || (usuarioLogado.Role != Roles.Organizador && usuarioLogado.Role != Roles.Admin))
                 return Forbid();
@@ -130,7 +123,6 @@ namespace GestaoEventosAPI.Controllers
                     return Forbid();
             }
 
-            // Atualiza os dados do evento
             eventoExistente.Nome = eventoDto.Nome;
             eventoExistente.Descricao = eventoDto.Descricao;
             eventoExistente.DataInicio = eventoDto.DataInicio;
@@ -142,7 +134,6 @@ namespace GestaoEventosAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Opcional: trazer o evento atualizado com organizador e usuário para retornar DTO completo
             Evento? eventoAtualizado = await _context.Eventos
                 .Include(e => e.Organizador)
                 .ThenInclude(o => o != null ? o.Usuario : null)
